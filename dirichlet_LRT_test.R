@@ -1,10 +1,10 @@
-#drichlet_LRT_test Single piece of code looking to perform the Dirichlet Likelihood Ratio Test with the option of 
+#drichlet_LRT_test Single piece of code to perform the Dirichlet Likelihood Ratio Test with the option of 
 #goodness-of-fit testing on multitype population data. The output will determine whether types play a significant role
 #in population structure and whether the Dirichlet model provides a reasonable fit to the observed data, as described in
-#Shaw et al. (2017). The power of the test under H_0 can also be estimated.
+#DirtyGenes. The power of the test under H_1 can also be estimated.
 library(gtools)
 library(plyr)
-dirichlet.LRT.test = function(df,randomise = 0, ever.present = TRUE, min.proportion = 0, col = 1, gof.sims = NULL, 
+dirichlet_LRT_test = function(df,randomise = NULL, ever.present = TRUE, min.proportion = 0, col = 1, gof.sims = NULL, 
                               power.sims = NULL, power.threshold = 0.05, power.plot.obs = NULL){
   #Input should be df: a data frame in which rows denote a population observation, one of the columns 
   #(default column 1) denotes the environment and the remaining columns dentoe number/proportions
