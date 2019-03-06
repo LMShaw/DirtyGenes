@@ -131,7 +131,7 @@ dirichlet_LRT_test = function(df,randomise = NULL, ever.present = TRUE, min.prop
         simdata = rbind(simdata,rdirichlet(counts[i],main$alt.parameters[i,]))
         #Simulates the data under the alternative hypothesis
       }
-      pvals[j] = dirLRT(cbind(df[,1],simdata))$LRT.p
+      pvals[j] = dirLRT(cbind(df[,1],simdata))$chisq.p
     }
     power.estimate = sum(pvals < power.threshold)/power.sims
     p.est <- NULL
@@ -148,7 +148,7 @@ dirichlet_LRT_test = function(df,randomise = NULL, ever.present = TRUE, min.prop
             simdata = rbind(simdata,rdirichlet(k,main$alt.parameters[i,]))
             #Simulates the data under the alternative hypothesis
           }
-          pvals[j] = dirLRT(cbind(rep(levels(df[,1]),each = k),simdata))$LRT.p #Final simulated data frame
+          pvals[j] = dirLRT(cbind(rep(levels(df[,1]),each = k),simdata))$chisq.p #Final simulated data frame
         }
         p.est[k-1] = sum(pvals < power.threshold)/power.sims
       }
