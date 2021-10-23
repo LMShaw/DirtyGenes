@@ -6,8 +6,17 @@
 library(gtools)
 library(plyr)
 
+# Parallelisation libraries
+library(parallel)
+library(MASS)
+library(doParallel)
+
+library(iterators)
+library(foreach)
+
 dirichlet_LRT_test = function(df,randomise = NULL, ever.present = TRUE, min.proportion = 0, col = 1, gof.sims = NULL,
-                              power.sims = NULL, power.threshold = 0.05, power.plot.obs = NULL){
+                              power.sims = NULL, power.threshold = 0.05, power.plot.obs = NULL,
+                              parallelise = FALSE, numCores = detectCores()){
   #Input should be df: a data frame in which rows denote a population observation, one of the columns
   #(default column 1) denotes the environment and the remaining columns dentoe number/proportions
   #of each class "type" within the population.
@@ -25,6 +34,11 @@ dirichlet_LRT_test = function(df,randomise = NULL, ever.present = TRUE, min.prop
   #power.threshold: Determines the default level of significance of the test for power estimations. Default = 0.05
   #power.plot.obs: If given and power.sims is also given, a plot will be produced estimating the power
   #of the test if the MLE under H_1 is true for each value in the vector power.plot.obs observations of each environment.
+
+  #Init parallisation cluster
+  if (parallelise){
+    registerDoParallel(numCores)
+  }
 
   optimloglik=function(param,x){
     #Function uses dirichlet loglikelihood for optimisation purposes (negative uses min rather than max)
@@ -128,15 +142,33 @@ dirichlet_LRT_test = function(df,randomise = NULL, ever.present = TRUE, min.prop
   } else {
     #Test the power of the current observation format
     pvals = rep(0,power.sims) #A vector to stor p-values from each simulation
-    for (j in 1:power.sims){
-      #print(j) #Uncomment to monitor progress
-      simdata = as.data.frame(matrix(nrow=0,ncol = ncol(x))) #Set up simulated data frame
-      for (i in 1:length(counts)){
-        simdata = rbind(simdata,rdirichlet(counts[i],main$alt.parameters[i,]))
-        #Simulates the data under the alternative hypothesis
+
+    # Parallelise if set
+    if (parallelise) {
+      pvals <- foreach(
+        j = 1:power.sims,
+        .combine = c,
+        .packages = "gtools") %dopar% {
+          #print(j) #Uncomment to monitor progress
+          simdata = as.data.frame(matrix(nrow=0,ncol = ncol(x))) #Set up simulated data frame
+          for (i in 1:length(counts)){
+            simdata = rbind(simdata,rdirichlet(counts[i],main$alt.parameters[i,]))
+            #Simulates the data under the alternative hypothesis
+          }
+          dirLRT(cbind(df[,1],simdata))$chisq.p
+        }
+    } else {
+      for (j in 1:power.sims){
+        #print(j) #Uncomment to monitor progress
+        simdata = as.data.frame(matrix(nrow=0,ncol = ncol(x))) #Set up simulated data frame
+        for (i in 1:length(counts)){
+          simdata = rbind(simdata,rdirichlet(counts[i],main$alt.parameters[i,]))
+          #Simulates the data under the alternative hypothesis
+        }
+        pvals[j] = dirLRT(cbind(df[,1],simdata))$chisq.p
       }
-      pvals[j] = dirLRT(cbind(df[,1],simdata))$chisq.p
     }
+
     power.estimate = sum(pvals < power.threshold)/power.sims
     p.est <- NULL
 
@@ -147,22 +179,49 @@ dirichlet_LRT_test = function(df,randomise = NULL, ever.present = TRUE, min.prop
         k <- power.plot.obs[kIndex]
         #Need two observations of each environment
         pvals = rep(0,power.sims) #A vector to stor p-values from each simulation
-        for (j in 1:power.sims){
-          #print(c(k,j)) #Uncomment to print current part ofsimulation
-          simdata = as.data.frame(matrix(nrow=0,ncol = ncol(x))) #Set up simulated data frame
-          for (i in 1:length(counts)){
-            simdata = rbind(simdata,rdirichlet(k,main$alt.parameters[i,]))
-            #Simulates the data under the alternative hypothesis
+
+        if (parallelise){
+
+          pvals <- foreach (
+            j=1:power.sims,
+            .combine=c,
+            .packages='gtools') %dopar% {
+            #print(c(k,j)) #Uncomment to print current part ofsimulation
+            simdata = as.data.frame(matrix(nrow=0,ncol = ncol(x))) #Set up simulated data frame
+            for (i in 1:length(counts)){
+              simdata = rbind(simdata,rdirichlet(k,main$alt.parameters[i,]))
+              #Simulates the data under the alternative hypothesis
+            }
+
+            factoredDF <- cbind(rep(levels(as.factor(df[,1])),each = k),simdata)
+            factoredDF[,1] <- as.factor(factoredDF[,1])
+
+            dirLRT(factoredDF)$chisq.p #Final simulated data frame
           }
+        } else {
+          for (j in 1:power.sims){
+            #print(c(k,j)) #Uncomment to print current part ofsimulation
+            simdata = as.data.frame(matrix(nrow=0,ncol = ncol(x))) #Set up simulated data frame
+            for (i in 1:length(counts)){
+              simdata = rbind(simdata,rdirichlet(k,main$alt.parameters[i,]))
+              #Simulates the data under the alternative hypothesis
+            }
 
-          factoredDF <- cbind(rep(levels(as.factor(df[,1])),each = k),simdata)
-          factoredDF[,1] <- as.factor(factoredDF[,1])
+            factoredDF <- cbind(rep(levels(as.factor(df[,1])),each = k),simdata)
+            factoredDF[,1] <- as.factor(factoredDF[,1])
 
-          pvals[j] = dirLRT(factoredDF)$chisq.p #Final simulated data frame
+            pvals[j] = dirLRT(factoredDF)$chisq.p #Final simulated data frame
+          }
         }
+
         p.est[kIndex] = sum(pvals < power.threshold)/power.sims
       }
+
       plot(power.plot.obs,p.est)
+    }
+
+    if (parallelise){
+      stopImplicitCluster()
     }
   }
 
