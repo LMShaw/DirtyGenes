@@ -34,6 +34,8 @@ dirichlet_LRT_test = function(df,randomise = NULL, ever.present = TRUE, min.prop
   #power.threshold: Determines the default level of significance of the test for power estimations. Default = 0.05
   #power.plot.obs: If given and power.sims is also given, a plot will be produced estimating the power
   #of the test if the MLE under H_1 is true for each value in the vector power.plot.obs observations of each environment.
+  #parallelise: set TRUE to have the more expensive loops run in parallel for an increase in execution speed
+  #numCores: number of logical cores to use in parallelisation - maximum available by default. Should be minimum 2.
 
   #Init parallisation cluster
   if (parallelise){
